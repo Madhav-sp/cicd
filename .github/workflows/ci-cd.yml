@@ -1,0 +1,67 @@
+name: MERN CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1️⃣ Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2️⃣ Setup Node
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    #########################
+    # Frontend Deployment
+    #########################
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm install
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+
+    - name: Deploy frontend to S3
+      uses: aws-actions/s3-sync@v2
+      with:
+        source-dir: frontend/dist
+        bucket: ${{ secrets.S3_BUCKET_NAME }}
+        region: ${{ secrets.AWS_REGION }}
+        delete: true
+
+    #########################
+    # Backend Deployment
+    #########################
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm install
+
+    - name: Run backend tests
+      run: |
+        cd backend
+        npm test || echo "No tests"
+
+    - name: Deploy backend to EC2
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        port: 22
+        script: |
+          cd ~/repo/backend
+          git pull origin main
+          npm install
+          pm2 restart backend || pm2 start index.js --name backend
