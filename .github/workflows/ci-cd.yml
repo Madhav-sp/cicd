@@ -9,18 +9,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1️⃣ Checkout code
+    #########################
+    # 1️⃣ Checkout repo
+    #########################
     - name: Checkout code
       uses: actions/checkout@v3
 
+    #########################
     # 2️⃣ Setup Node
+    #########################
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
         node-version: 18
 
     #########################
-    # Frontend Deployment
+    # 3️⃣ Frontend Deployment
     #########################
     - name: Install frontend dependencies
       run: |
@@ -33,15 +37,15 @@ jobs:
         npm run build
 
     - name: Deploy frontend to S3
-      uses: aws-actions/s3-sync@v2
+      uses: aws-actions/s3-sync@v1
       with:
+        args: --acl public-read --delete
         source-dir: frontend/dist
         bucket: ${{ secrets.S3_BUCKET_NAME }}
         region: ${{ secrets.AWS_REGION }}
-        delete: true
 
     #########################
-    # Backend Deployment
+    # 4️⃣ Backend Deployment
     #########################
     - name: Install backend dependencies
       run: |
@@ -61,7 +65,11 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         port: 22
         script: |
+          # Navigate to backend folder on EC2
           cd ~/repo/backend
+          # Pull latest code from GitHub
           git pull origin main
+          # Install any new dependencies
           npm install
+          # Restart backend with PM2, or start if not running
           pm2 restart backend || pm2 start index.js --name backend
